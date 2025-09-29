@@ -58,6 +58,35 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
+def cleanup_old_faces_for_user(username):
+    """Delete any existing faces for a username before registering new one"""
+    try:
+        print(f"[CLEANUP] Checking for existing faces for username: {username}")
+        
+        # List all faces in collection
+        response = rekognition.list_faces(CollectionId=COLLECTION_ID)
+        faces = response.get('Faces', [])
+        
+        # Find faces with matching ExternalImageId
+        faces_to_delete = []
+        for face in faces:
+            if face.get('ExternalImageId') == username:
+                faces_to_delete.append(face['FaceId'])
+                print(f"[CLEANUP] Found existing face: {face['FaceId']}")
+        
+        # Delete old faces if any
+        if faces_to_delete:
+            rekognition.delete_faces(
+                CollectionId=COLLECTION_ID,
+                FaceIds=faces_to_delete
+            )
+            print(f"[CLEANUP] Deleted {len(faces_to_delete)} old face(s) for user: {username}")
+        else:
+            print(f"[CLEANUP] No existing faces found for user: {username}")
+            
+    except Exception as e:
+        print(f"[CLEANUP] Warning: Could not cleanup old faces: {str(e)}")
+
 def init_aws_resources():
     """Initialize all AWS resources"""
     print("\n" + "="*60)
@@ -244,6 +273,9 @@ def api_register():
             print(f"[REGISTER] Error: User already exists")
             return jsonify({'error': 'Username already exists'}), 400
         
+        # Clean up any old faces for this username (in case of previous failed registrations)
+        cleanup_old_faces_for_user(username)
+        
         # Read image
         image_bytes = file.read()
         print(f"[REGISTER] Image size: {len(image_bytes)} bytes")
@@ -263,11 +295,11 @@ def api_register():
         print(f"[REGISTER] S3 upload successful")
         
         print(f"[REGISTER] Indexing face in Rekognition...")
-        # Index face in Rekognition - FIXED: Use username as ExternalImageId
+        # Index face in Rekognition - Use username as ExternalImageId
         response = rekognition.index_faces(
             CollectionId=COLLECTION_ID,
             Image={'S3Object': {'Bucket': BUCKET_NAME, 'Name': filename}},
-            ExternalImageId=username,  # CHANGED: Use username instead of user_id
+            ExternalImageId=username,
             DetectionAttributes=['ALL']
         )
         
@@ -276,7 +308,7 @@ def api_register():
             return jsonify({'error': 'No face detected in image'}), 400
         
         face_id = response['FaceRecords'][0]['Face']['FaceId']
-        print(f"[REGISTER] Face indexed successfully. Face ID: {face_id}")
+        print(f"[REGISTER] Face indexed successfully. Face ID: {face_id}, ExternalImageId: {username}")
         
         print(f"[REGISTER] Storing user in DynamoDB...")
         # Store user in DynamoDB
@@ -349,17 +381,17 @@ def api_login():
         
         # Get matched face
         match = response['FaceMatches'][0]
-        username = match['Face']['ExternalImageId']  # CHANGED: This is now username
+        username = match['Face']['ExternalImageId']
         confidence = match['Similarity']
         
         print(f"[LOGIN] Face matched! Username: {username}, Confidence: {confidence}%")
         
-        # Get user from DynamoDB - FIXED: Direct lookup by username
+        # Get user from DynamoDB - Direct lookup by username
         response = users_table.get_item(Key={'username': username})
         
         if 'Item' not in response:
-            print(f"[LOGIN] Error: User not found in database")
-            return jsonify({'error': 'User not found'}), 404
+            print(f"[LOGIN] Error: User '{username}' not found in database")
+            return jsonify({'error': 'User not found in database. Please contact administrator.'}), 404
         
         user = response['Item']
         print(f"[LOGIN] User found: {user['username']}")
@@ -423,6 +455,9 @@ def api_create_user():
         if 'Item' in response:
             return jsonify({'error': 'Username already exists'}), 400
         
+        # Clean up any old faces for this username
+        cleanup_old_faces_for_user(new_username)
+        
         image_bytes = file.read()
         user_id = str(uuid.uuid4())
         filename = f"users/{user_id}/{secure_filename(file.filename)}"
@@ -435,11 +470,11 @@ def api_create_user():
             ContentType=file.content_type
         )
         
-        # Index face - FIXED: Use username as ExternalImageId
+        # Index face - Use username as ExternalImageId
         response = rekognition.index_faces(
             CollectionId=COLLECTION_ID,
             Image={'S3Object': {'Bucket': BUCKET_NAME, 'Name': filename}},
-            ExternalImageId=new_username,  # CHANGED: Use username instead of user_id
+            ExternalImageId=new_username,
             DetectionAttributes=['ALL']
         )
         
@@ -447,6 +482,7 @@ def api_create_user():
             return jsonify({'error': 'No face detected'}), 400
         
         face_id = response['FaceRecords'][0]['Face']['FaceId']
+        print(f"[CREATE USER] Face indexed. Face ID: {face_id}, ExternalImageId: {new_username}")
         
         # Store user
         users_table.put_item(
@@ -522,6 +558,65 @@ def api_logout():
         return redirect(url_for('home'))
     
     return jsonify({'success': True, 'message': 'Logged out successfully'}), 200
+
+# ==================== ADMIN/DEBUG ROUTES ====================
+
+@app.route('/api/admin/list-faces', methods=['GET'])
+@login_required
+def api_list_faces():
+    """API: List all faces in Rekognition collection (for debugging)"""
+    try:
+        response = rekognition.list_faces(CollectionId=COLLECTION_ID, MaxResults=100)
+        faces = response.get('Faces', [])
+        
+        face_list = []
+        for face in faces:
+            face_list.append({
+                'face_id': face['FaceId'],
+                'external_image_id': face.get('ExternalImageId', 'N/A'),
+                'image_id': face.get('ImageId', 'N/A')
+            })
+        
+        return jsonify({
+            'success': True,
+            'total_faces': len(face_list),
+            'faces': face_list
+        }), 200
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/admin/cleanup-faces', methods=['POST'])
+@login_required
+def api_cleanup_faces():
+    """API: Remove all faces from Rekognition collection"""
+    try:
+        response = rekognition.list_faces(CollectionId=COLLECTION_ID)
+        faces = response.get('Faces', [])
+        
+        if not faces:
+            return jsonify({'success': True, 'message': 'No faces to delete', 'deleted_count': 0}), 200
+        
+        face_ids = [face['FaceId'] for face in faces]
+        
+        delete_response = rekognition.delete_faces(
+            CollectionId=COLLECTION_ID,
+            FaceIds=face_ids
+        )
+        
+        deleted_count = len(delete_response.get('DeletedFaces', []))
+        
+        log_activity(session['user_id'], session['username'], 
+                    f'cleanup_all_faces', f'deleted_{deleted_count}_faces')
+        
+        return jsonify({
+            'success': True,
+            'message': f'Successfully deleted {deleted_count} face(s)',
+            'deleted_count': deleted_count
+        }), 200
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 # ==================== ERROR HANDLERS ====================
 
