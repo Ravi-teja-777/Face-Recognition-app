@@ -256,7 +256,8 @@ def api_register():
             return jsonify({'error': 'Username required'}), 400
         
         file = request.files['image']
-        username = request.form['username']
+        # NORMALIZE USERNAME TO LOWERCASE
+        username = request.form['username'].strip().lower()
         
         print(f"[REGISTER] Username: {username}, File: {file.filename}")
         
@@ -295,11 +296,11 @@ def api_register():
         print(f"[REGISTER] S3 upload successful")
         
         print(f"[REGISTER] Indexing face in Rekognition...")
-        # Index face in Rekognition - Use username as ExternalImageId
+        # Index face in Rekognition - Use LOWERCASE username as ExternalImageId
         response = rekognition.index_faces(
             CollectionId=COLLECTION_ID,
             Image={'S3Object': {'Bucket': BUCKET_NAME, 'Name': filename}},
-            ExternalImageId=username,
+            ExternalImageId=username,  # Now guaranteed to be lowercase
             DetectionAttributes=['ALL']
         )
         
@@ -314,7 +315,7 @@ def api_register():
         # Store user in DynamoDB
         users_table.put_item(
             Item={
-                'username': username,
+                'username': username,  # Lowercase
                 'user_id': user_id,
                 'face_id': face_id,
                 's3_key': filename,
@@ -343,6 +344,7 @@ def api_register():
         print(f"[REGISTER] Error: {str(e)}")
         print(traceback.format_exc())
         return jsonify({'error': f'Registration failed: {str(e)}'}), 500
+
 
 @app.route('/api/login', methods=['POST'])
 def api_login():
@@ -381,10 +383,11 @@ def api_login():
         
         # Get matched face
         match = response['FaceMatches'][0]
-        username = match['Face']['ExternalImageId']
+        # NORMALIZE USERNAME TO LOWERCASE
+        username = match['Face']['ExternalImageId'].strip().lower()
         confidence = match['Similarity']
         
-        print(f"[LOGIN] Face matched! Username: {username}, Confidence: {confidence}%")
+        print(f"[LOGIN] Face matched! ExternalImageId: {match['Face']['ExternalImageId']}, Normalized username: {username}, Confidence: {confidence}%")
         
         # Get user from DynamoDB - Direct lookup by username
         response = users_table.get_item(Key={'username': username})
@@ -429,6 +432,7 @@ def api_login():
         print(traceback.format_exc())
         return jsonify({'error': f'Login failed: {str(e)}'}), 500
 
+
 @app.route('/api/create-user', methods=['POST'])
 @login_required
 def api_create_user():
@@ -443,7 +447,8 @@ def api_create_user():
             return jsonify({'error': 'Username required'}), 400
         
         file = request.files['image']
-        new_username = request.form['username']
+        # NORMALIZE USERNAME TO LOWERCASE
+        new_username = request.form['username'].strip().lower()
         
         print(f"[CREATE USER] New username: {new_username}")
         
@@ -470,11 +475,11 @@ def api_create_user():
             ContentType=file.content_type
         )
         
-        # Index face - Use username as ExternalImageId
+        # Index face - Use LOWERCASE username as ExternalImageId
         response = rekognition.index_faces(
             CollectionId=COLLECTION_ID,
             Image={'S3Object': {'Bucket': BUCKET_NAME, 'Name': filename}},
-            ExternalImageId=new_username,
+            ExternalImageId=new_username,  # Lowercase
             DetectionAttributes=['ALL']
         )
         
@@ -487,7 +492,7 @@ def api_create_user():
         # Store user
         users_table.put_item(
             Item={
-                'username': new_username,
+                'username': new_username,  # Lowercase
                 'user_id': user_id,
                 'face_id': face_id,
                 's3_key': filename,
@@ -641,3 +646,4 @@ if __name__ == '__main__':
     print("Press CTRL+C to quit\n")
     
     app.run(host='0.0.0.0', port=5000, debug=True)
+
