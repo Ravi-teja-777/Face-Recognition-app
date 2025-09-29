@@ -263,11 +263,11 @@ def api_register():
         print(f"[REGISTER] S3 upload successful")
         
         print(f"[REGISTER] Indexing face in Rekognition...")
-        # Index face in Rekognition
+        # Index face in Rekognition - FIXED: Use username as ExternalImageId
         response = rekognition.index_faces(
             CollectionId=COLLECTION_ID,
             Image={'S3Object': {'Bucket': BUCKET_NAME, 'Name': filename}},
-            ExternalImageId=user_id,
+            ExternalImageId=username,  # CHANGED: Use username instead of user_id
             DetectionAttributes=['ALL']
         )
         
@@ -349,22 +349,19 @@ def api_login():
         
         # Get matched face
         match = response['FaceMatches'][0]
-        external_image_id = match['Face']['ExternalImageId']
+        username = match['Face']['ExternalImageId']  # CHANGED: This is now username
         confidence = match['Similarity']
         
-        print(f"[LOGIN] Face matched! User ID: {external_image_id}, Confidence: {confidence}%")
+        print(f"[LOGIN] Face matched! Username: {username}, Confidence: {confidence}%")
         
-        # Get user from DynamoDB
-        response = users_table.scan(
-            FilterExpression='user_id = :uid',
-            ExpressionAttributeValues={':uid': external_image_id}
-        )
+        # Get user from DynamoDB - FIXED: Direct lookup by username
+        response = users_table.get_item(Key={'username': username})
         
-        if not response['Items']:
+        if 'Item' not in response:
             print(f"[LOGIN] Error: User not found in database")
             return jsonify({'error': 'User not found'}), 404
         
-        user = response['Items'][0]
+        user = response['Item']
         print(f"[LOGIN] User found: {user['username']}")
         
         # Update login count
@@ -438,11 +435,11 @@ def api_create_user():
             ContentType=file.content_type
         )
         
-        # Index face
+        # Index face - FIXED: Use username as ExternalImageId
         response = rekognition.index_faces(
             CollectionId=COLLECTION_ID,
             Image={'S3Object': {'Bucket': BUCKET_NAME, 'Name': filename}},
-            ExternalImageId=user_id,
+            ExternalImageId=new_username,  # CHANGED: Use username instead of user_id
             DetectionAttributes=['ALL']
         )
         
