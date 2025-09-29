@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+{% block title %}Home - Face Authentication{% endblock %}
+
+{% block content %}
+<div class="card" style="max-width: 700px;">
+    <div class="card-header">
+        <h1>🔐 Welcome to FaceAuth</h1>
+        <p>Secure facial recognition authentication system</p>
+    </div>
+    
+    <div style="text-align: center; margin: 2rem 0;">
+        <div style="font-size: 5rem; margin-bottom: 1rem;">👤</div>
+        <h2 style="color: #667eea; margin-bottom: 1rem;">Login with Your Face</h2>
+        <p style="color: #666; margin-bottom: 2rem; line-height: 1.6;">
+            Experience the future of authentication. No passwords needed - just your face!
+        </p>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 2rem;">
+        <div style="text-align: center; padding: 1.5rem; background: #f8f9fa; border-radius: 10px;">
+            <div style="font-size: 2rem; margin-bottom: 0.5rem;">⚡</div>
+            <h3 style="font-size: 1rem; margin-bottom: 0.5rem;">Fast</h3>
+            <p style="font-size: 0.85rem; color: #666;">Login in seconds</p>
+        </div>
+        <div style="text-align: center; padding: 1.5rem; background: #f8f9fa; border-radius: 10px;">
+            <div style="font-size: 2rem; margin-bottom: 0.5rem;">🔒</div>
+            <h3 style="font-size: 1rem; margin-bottom: 0.5rem;">Secure</h3>
+            <p style="font-size: 0.85rem; color: #666;">Advanced encryption</p>
+        </div>
+    </div>
+
+    <div style="display: flex; gap: 1rem;">
+        <a href="{{ url_for('login_page') }}" style="flex: 1; text-decoration: none;">
+            <button class="btn btn-primary">Login</button>
+        </a>
+        <a href="{{ url_for('register_page') }}" style="flex: 1; text-decoration: none;">
+            <button class="btn btn-secondary">Register</button>
+        </a>
+    </div>
+</div>
+{% endblock %}

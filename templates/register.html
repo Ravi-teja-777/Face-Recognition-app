@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+
+{% block title %}Register - Face Authentication{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h1>Create Account</h1>
+        <p>Register with your face</p>
+    </div>
+
+    <form id="registerForm" enctype="multipart/form-data">
+        <div style="margin-bottom: 1.5rem;">
+            <label style="display: block; margin-bottom: 0.5rem; color: #333; font-weight: 500;">Username</label>
+            <input type="text" id="username" name="username" required 
+                   style="width: 100%; padding: 0.75rem; border: 2px solid #e0e0e0; border-radius: 10px; font-size: 1rem;">
+        </div>
+
+        <div style="margin-bottom: 1.5rem;">
+            <label style="display: block; margin-bottom: 0.5rem; color: #333; font-weight: 500;">Upload Face Photo</label>
+            <input type="file" id="image" name="image" accept="image/*" required
+                   style="width: 100%; padding: 0.75rem; border: 2px solid #e0e0e0; border-radius: 10px;">
+        </div>
+
+        <div id="preview" style="margin-bottom: 1.5rem; text-align: center; display: none;">
+            <img id="previewImg" style="max-width: 100%; max-height: 300px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1);">
+        </div>
+
+        <div id="message" style="margin-bottom: 1rem;"></div>
+
+        <button type="submit" class="btn btn-primary" id="submitBtn">
+            Register
+        </button>
+    </form>
+
+    <p style="text-align: center; margin-top: 1.5rem; color: #666;">
+        Already have an account? <a href="{{ url_for('login_page') }}" style="color: #667eea; text-decoration: none; font-weight: 600;">Login</a>
+    </p>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const imageInput = document.getElementById('image');
+    const preview = document.getElementById('preview');
+    const previewImg = document.getElementById('previewImg');
+    const form = document.getElementById('registerForm');
+    const submitBtn = document.getElementById('submitBtn');
+    const messageDiv = document.getElementById('message');
+
+    imageInput.addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                previewImg.src = e.target.result;
+                preview.style.display = 'block';
+            };
+            reader.readAsDataURL(file);
+        }
+    });
+
+    form.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const formData = new FormData();
+        formData.append('username', document.getElementById('username').value);
+        formData.append('image', document.getElementById('image').files[0]);
+
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Registering...';
+        messageDiv.innerHTML = '';
+
+        try {
+            const response = await fetch('/api/register', {
+                method: 'POST',
+                body: formData
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                messageDiv.innerHTML = '<div class="alert alert-success">' + data.message + '</div>';
+                setTimeout(() => {
+                    window.location.href = data.redirect;
+                }, 1500);
+            } else {
+                messageDiv.innerHTML = '<div class="alert alert-error">' + data.error + '</div>';
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Register';
+            }
+        } catch (error) {
+            messageDiv.innerHTML = '<div class="alert alert-error">Registration failed. Please try again.</div>';
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Register';
+        }
+    });
+</script>
+{% endblock %}
+

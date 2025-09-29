@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{% block title %}Profile - Face Authentication{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h1>Your Profile</h1>
+        <p>Account information</p>
+    </div>
+
+    <div style="text-align: center; margin-bottom: 2rem;">
+        <div style="width: 120px; height: 120px; border-radius: 50%; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                    margin: 0 auto 1rem; display: flex; align-items: center; justify-content: center; font-size: 3rem; color: white;">
+            👤
+        </div>
+        <h2 style="color: #333; margin-bottom: 0.5rem;">{{ user.username }}</h2>
+        <p style="color: #666; font-size: 0.9rem;">User ID: {{ user.user_id[:8] }}...</p>
+    </div>
+
+    <div style="background: #f8f9fa; border-radius: 15px; padding: 1.5rem; margin-bottom: 1.5rem;">
+        <div style="margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid #e0e0e0;">
+            <label style="color: #666; font-size: 0.9rem; display: block; margin-bottom: 0.25rem;">Username</label>
+            <div style="color: #333; font-weight: 600;">{{ user.username }}</div>
+        </div>
+
+        <div style="margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid #e0e0e0;">
+            <label style="color: #666; font-size: 0.9rem; display: block; margin-bottom: 0.25rem;">User ID</label>
+            <div style="color: #333; font-weight: 600; word-break: break-all;">{{ user.user_id }}</div>
+        </div>
+
+        <div style="margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid #e0e0e0;">
+            <label style="color: #666; font-size: 0.9rem; display: block; margin-bottom: 0.25rem;">Face ID</label>
+            <div style="color: #333; font-weight: 600; word-break: break-all;">{{ user.face_id }}</div>
+        </div>
+
+        <div style="margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid #e0e0e0;">
+            <label style="color: #666; font-size: 0.9rem; display: block; margin-bottom: 0.25rem;">Total Logins</label>
+            <div style="color: #333; font-weight: 600;">{{ user.login_count }}</div>
+        </div>
+
+        <div>
+            <label style="color: #666; font-size: 0.9rem; display: block; margin-bottom: 0.25rem;">Member Since</label>
+            <div style="color: #333; font-weight: 600;">{{ user.created_at[:10] if user.created_at else 'N/A' }}</div>
+        </div>
+    </div>
+
+    <a href="{{ url_for('dashboard') }}" style="text-decoration: none;">
+        <button class="btn btn-primary">Back to Dashboard</button>
+    </a>
+</div>
+{% endblock %}
